@@ -27,12 +27,17 @@ git push
 
 6. Create Merge Request 
   - Go to github 
-  - Select your branch from the drop down on the left corner 
-  - Click create merge request 
+  - Go to pull requests 
+  - Click new 
+  - Make sure compare: is your branch
+  - Create pull request 
+  - Write notes if you want go to bottom and click pull request 
+
 
 7. Once Merge Request is approved merge into main
 
 - Go to your merge request on github and merge
+- Click confirm merge
 
 8. Merge main into your local branch (push the changes to your remote)
 ```sh
