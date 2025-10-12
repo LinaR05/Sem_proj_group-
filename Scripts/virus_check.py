@@ -29,9 +29,7 @@ def check_file_hash(file_hash: str):
 
 # Function to check a URL instead of a file hash
 def check_url(target_url: str):
-    """
-    Submit and check a URL scan result on VirusTotal.
-    """
+
     url = "https://www.virustotal.com/api/v3/urls"
     headers = {"x-apikey": API_KEY}
     data = {"url": target_url}
