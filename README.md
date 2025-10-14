@@ -33,13 +33,18 @@ git push
   - Create pull request 
   - Write notes if you want go to bottom and click pull request 
 
+7. Someone accepts your merge request
+  - Go to pull requests
+  - Click on files changed tab
+  - Click review changes on right corner
+  - Click "approve" or "request changes" if you want changes in person code
 
-7. Once Merge Request is approved merge into main
+8. Once Merge Request is approved merge into main
 
 - Go to your merge request on github and merge
 - Click confirm merge
 
-8. Merge main into your local branch (push the changes to your remote)
+9. Merge main into your local branch (push the changes to your remote)
 ```sh
 git fetch 
 git merge origin/main
