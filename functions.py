@@ -128,7 +128,7 @@ def install_pre_push_hook():
             print("\nAll files are clean. Safe to push.")
             return True
 
-    print("Pre-push hook installed successfully.")
+    print("Pre-push hook installed successfully.") 
     return pre_push_hook
 
 #Should Block Push
