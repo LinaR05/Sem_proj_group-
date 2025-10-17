@@ -22,11 +22,9 @@ This ensures that teams and individual developers maintain clean, secure reposit
 **Domain Focus:** Information Retrieval and Analysis Tool  
 
 **Problem Statement:**  
-Every day, thousands of files are pushed to online repositories by developers across the world. Some of these files may unknowingly contain malware or other harmful code.  
-This poses a significant security risk to organizations, open-source communities, and individuals alike.
+Every day, thousands of files are pushed to online repositories by developers across the world. Some of these files may unknowingly contain malware or other harmful code. This poses a significant security risk to organizations, open-source communities, and individuals alike.
 
-Our project addresses this issue by developing a **Git-integrated virus scanner** that automatically checks all files staged for commit before a push occurs.  
-If a file is found to be unsafe, the push is blocked, and a clear report is provided to the user.
+Our project addresses this issue by developing a **Git-integrated virus scanner** that automatically checks all files staged for commit before a push occurs. If a file is found to be unsafe, the push is blocked, and a clear report is provided to the user.
 
 **Who this helps:**  
 - Software developers  
@@ -44,7 +42,7 @@ This tool promotes safe collaboration, reduces the risk of introducing malware, 
 ### Prerequisites
 - **Python 3.10 or higher**  
 - **Git** installed and configured  
-- A **Virus Scanning API key** (e.g., VirusTotal or similar service)  
+- A **Virus Scanning API key** (Virus Total)  
 - Internet access for API-based scanning  
 
 ### Setup Steps
