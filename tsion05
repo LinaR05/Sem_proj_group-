@@ -1,2 +1,76 @@
-# testing 
-i am going to merge now
+from typing import Dict, Any, Optional
+from pathlib import Path
+import json
+import requests
+import os
+
+def load_config(config_path: str) -> Dict[str, Any]:
+    """ Load configuration from a JSON file. 
+    The config is expected to include keys like api_key, base_url, timeout_s.
+    """
+    if not isinstance (config_path, str):
+        raise TypeError("config_path must be a string.")
+    
+    path = Path(config_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+    if path.suffix.lower() != '.json':
+        raise ValueError(f"Configuration file must be a JSON file.")
+    try:
+        with path.open('r', encoding='utf-8') as f:
+            config_data = json.load(f)
+    except json.JSONDecodeError:
+            raise ValueError("Configuration file is not a valid JSON.")
+            
+    return config_data
+    
+def validate_config(config: Dict[str, Any]) -> None:
+
+    """ Validate that the configuration dictionary contains required keys with correct types. """
+    
+    if not isinstance(config, dict):
+        raise TypeError("Config must be a dictionary.")
+    
+    required_keys = {
+        "api_key": str,
+        "base_url": str,
+        "timeout_s": (int, float)
+    }
+
+    for key, expected_type in required_keys.items():
+        if key not in config:
+            raise KeyError(f"Missing required config key: {key}")
+        if not isinstance(config[key], expected_type):
+            raise TypeError(f"Config key '{key}' must be of type {expected_type}.")
+        
+    base_url: str = config["base_url"]
+    if not (base_url.startswith("http://") or base_url.startswith("https://")):
+        raise ValueError("base_url must start with 'http://' or 'https://'.")
+    
+    print("Configuration is valid.")
+
+def build_api_client(api_key: str, base_url: str, timeout_s: float) -> Any:
+    
+    if requests is None:
+        raise ImportError("The 'requests' library is required to build the API client.")
+    
+    session = requests.Session()
+    session.headers.update({
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    })
+    setattr(session, 'base_url', base_url.rstrip('/'))
+    setattr(session, 'default_timeout_s', float(timeout_s))
+    return session
+
+def detect_git_repository_root(start_dir: Optional[str] = None) -> str:
+    """ Detect the root directory of a Git repository starting from start_dir or current working directory. """
+    current = Path(start_dir or os.getcwd()).resolve()
+    root = Path(current.root)
+    while True: 
+        if (current / '.git').is_dir():
+            return str(current)
+        if current == root:
+            raise FileNotFoundError("No Git repository found in the directory.")
+        current = current.parent
