@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+⁠from typing import Any, Dict, List, Optional
 import hashlib
 import json
 import os
@@ -316,5 +316,3 @@ def run_pre_push_flow() -> int:
         return 1
     print("[scanner] All scanned files appear clean. Proceeding with push.")
     return 0
-
-
