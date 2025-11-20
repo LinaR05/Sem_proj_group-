@@ -51,20 +51,93 @@ This tool promotes safe collaboration, reduces the risk of introducing malware, 
    ```bash
    git clone https://github.com/your-org/GitHook-VirusScanner.git
    cd GitHook-VirusScanner
+   ```
 
-2. Install Requried Dependencies
-pip install -r requirements.txt
+2. **Install Required Dependencies**
+   ```bash
+   pip install -r examples/requirements.txt
+   ```
 
-3. Create Configuration File
-{
-  "api_key": "your_api_key_here",
-  "base_url": "https://api.virusscanner.com/v3/files",
-  "timeout_s": 30,
-  "scan_timeout_s": 120,
-  "poll_interval_s": 2
-}
+3. **Create Configuration File** (save as `virus_scan_config.json` in the repo root)
+   ```json
+   {
+     "api_key": "your_api_key_here",
+     "base_url": "https://api.virusscanner.com/v3/files",
+     "timeout_s": 30,
+     "scan_timeout_s": 120,
+     "poll_interval_s": 2
+   }
+   ```
 
-4. Install Pre-Push Hook
-python -c "import function_library as fl; fl.install_pre_push_hook('.')"
+4. **Install Pre-Push Hook**
+   ```bash
+   python - <<'PY'
+   from pathlib import Path
+   from src.Project_3 import ScanSession
+   import os
 
-5. Test 
+   session = ScanSession()
+   hook_path = Path(session.repo_root) / ".git" / "hooks" / "pre-push"
+   hook_path.parent.mkdir(parents=True, exist_ok=True)
+   hook_path.write_text(
+       "#!/bin/sh\npython - <<'PY2'\nfrom src.Project_3 import ScanSession\nexit(ScanSession().run_full_scan())\nPY2\n",
+       encoding="utf-8",
+   )
+   os.chmod(hook_path, 0o755)
+   PY
+   ```
+
+5. **Test**
+
+---
+
+## Project 3 Enhancements
+
+Project 3 transforms the previous functional/classes mix into a cohesive OO system:
+
+- `ScanArtifact` hierarchy models different staged assets (source, binaries, manifests).
+- `AbstractScanStrategy` hierarchy encapsulates how each asset gets scanned (hash lookup, chunked upload, manifest insights).
+- `HookBase` hierarchy enables new workflows (pre-push vs. manual scans) without duplicating orchestration logic.
+- `ScanSession` composes configuration, API client, artifact factory, and strategies to keep responsibilities isolated.
+
+### Class Hierarchy Diagram
+
+```
+ScanArtifact (ABC)
+├── SourceCodeArtifact
+├── BinaryArtifact
+└── ManifestArtifact
+
+AbstractScanStrategy (ABC)
+├── HashLookupStrategy
+├── ChunkedUploadStrategy
+└── ManifestInsightStrategy
+
+HookBase (ABC)
+├── PrePushHook
+└── ManualScanHook
+```
+
+See `docs/project3_architecture.md` for detailed rationale, design patterns, and composition decisions.
+
+### Polymorphism in Action
+
+```python
+from src.Project_3 import ScanSession
+
+session = ScanSession()
+exit_code = session.run_full_scan()  # PrePushHook by default
+```
+
+`ScanSession.scan_artifacts()` works against the `ScanArtifact` interface so the same call path handles binaries, manifests, and text files differently without branching.
+
+### Running Tests
+
+```bash
+pytest tests/test_project_3.py
+```
+
+The suite covers:
+- Enforced abstract base classes.
+- Strategy/Artifact polymorphism producing different scan metadata.
+- Composition-based hooks (manual vs. pre-push).
