@@ -8,3 +8,6 @@ build/
 .vscode/
 .DS_Store
 Thumbs.db
+
+virus_scan_config.json
+
