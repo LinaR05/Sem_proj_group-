@@ -5,9 +5,11 @@ Project 3 - Advanced OOP Virus Scanner System
 Extends the Project 1 & 2 utilities into a richer OO design that showcases
 inheritance hierarchies, abstract base classes, polymorphism, and composition.
 """
-
 from __future__ import annotations
 
+import time
+import json
+from datetime import datetime
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -303,8 +305,15 @@ class ScanSession:
         primitives.print_scan_report(results)
 
     def evaluate(self, results: Dict[str, Dict[str, Any]]) -> int:
-        verdict = {path: primitives.interpret_scan_result(result) for path, result in results.items()}
+        verdict = {
+            path: primitives.interpret_scan_result(result) 
+            for path, result in results.items()
+        }
         block = primitives.should_block_push(verdict)
+
+        # Save results BEFORE returning (even if blocked)
+        self._save_results(results)
+
         if block:
             print("[scanner] Push blocked by ScanSession evaluation.")
         return 1 if block else 0
@@ -313,6 +322,68 @@ class ScanSession:
         hook = hook or PrePushHook(self)
         return hook.run()
 
+    def _save_results(self, results: Dict[str, Dict[str, Any]]) -> None:
+        """
+        Append scan results to a persistent JSONL file so the system
+        retains history between runs.
+        """
+        history_path = Path(self.repo_root) / "scan_history.jsonl"
+
+        try:
+            with history_path.open("a", encoding="utf-8") as f:
+                entry = {
+                    "timestamp": time.time(),
+                    "datetime": datetime.now().isoformat(),  # Human-readable timestamp
+                    "repo_root": str(self.repo_root),
+                    "file_count": len(results),
+                    "results": results,
+                    "verdict": {
+                        path: primitives.interpret_scan_result(result) 
+                        for path, result in results.items()
+                    },
+                    "blocked": primitives.should_block_push({
+                        path: primitives.interpret_scan_result(result) 
+                        for path, result in results.items()
+                    })
+                }
+                json.dump(entry, f)
+                f.write("\n")
+            print(f"[scanner] Scan history saved to {history_path}")
+        except Exception as e:
+            print(f"[scanner] Warning: failed to save history: {e}")
+    
+    def load_scan_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Load scan history from the JSONL file.
+        
+        Args:
+            limit: Maximum number of recent scans to load (None = all)
+        
+        Returns:
+            List of scan entries, most recent first
+        """
+        history_path = Path(self.repo_root) / "scan_history.jsonl"
+        
+        if not history_path.exists():
+            return []
+        
+        try:
+            entries = []
+            with history_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        entries.append(json.loads(line))
+            
+            # Most recent first
+            entries.reverse()
+            
+            if limit:
+                return entries[:limit]
+            return entries
+            
+        except Exception as e:
+            print(f"[scanner] Warning: failed to load history: {e}")
+            return []
 
 class HookBase(ABC):
     """Base class for hook workflows. Demonstrates polymorphism over hook types."""
