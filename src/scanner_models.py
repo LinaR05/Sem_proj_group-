@@ -1,9 +1,5 @@
 """
-Project 3 - Advanced OOP Virus Scanner System
----------------------------------------------
-
-Extends the Project 1 & 2 utilities into a richer OO design that showcases
-inheritance hierarchies, abstract base classes, polymorphism, and composition.
+Final OOP Project: Git Hook VirusScanner Detector 
 """
 from __future__ import annotations
 
@@ -15,10 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-try:  # Support running as `python src/Project_3.py` or through package imports.
-    from src import library_name as primitives
+try: 
+    from . import virus_scanner_core as primitives
 except ImportError:  # pragma: no cover - fallback for direct execution.
-    import library_name as primitives  # type: ignore
+    import virus_scanner_core as primitives  # type: ignore
 
 
 class ScanArtifact(ABC):

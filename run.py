@@ -9,7 +9,7 @@ This will:
     - print a full report
 """
 
-from src.Project_3 import ScanSession, PrePushHook
+from src.scanner_models import ScanSession, PrePushHook
 
 
 def main():

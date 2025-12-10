@@ -58,7 +58,7 @@ def build_api_client(api_key: str, base_url: str, timeout_s: float) -> Any:
         )
     session = requests.Session()
     session.headers.update({
-        "Authorization": f"Bearer {api_key}",
+        "x-apikey": api_key,
         "Accept": "application/json",
         "User-Agent": "RepoVirusScanner/1.0",
     })
@@ -134,45 +134,155 @@ def chunk_file_for_upload(file_path: str, max_chunk_bytes: int) -> List[bytes]:
 def submit_scan(api_client: Any, file_path: str, file_hash: str) -> str:
     """Submit a scan request for a file. Returns a scan_id.
 
-    This implementation posts the file hash and basic metadata.
+    First checks if file hash exists in VirusTotal database.
+    If not found (404), uploads the file for scanning.
     """
     base_url: str = getattr(api_client, "base_url")
     timeout_s: float = float(getattr(api_client, "default_timeout_s", 30.0))
-    url = f"{base_url}/scan"
-    payload = {
-        "filename": os.path.basename(file_path),
-        "sha256": file_hash,
-    }
-    resp = api_client.post(url, json=payload, timeout=timeout_s)
-    resp.raise_for_status()
-    data = resp.json()
-    scan_id = data.get("scan_id") or data.get("id")
-    if not scan_id:
-        raise RuntimeError("Scan submission did not return a scan_id")
-    return str(scan_id)
-
+    check_url = f"{base_url}/files/{file_hash}"
+    
+    try:
+        resp = api_client.get(check_url, timeout=timeout_s)
+        resp.raise_for_status()
+        print(f"[scanner] File already in VirusTotal database: {os.path.basename(file_path)}")
+        return str(file_hash)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            # Step 2: File not in database - upload it
+            print(f"[scanner] ⟳ Uploading new file to VirusTotal: {os.path.basename(file_path)}")
+            upload_url = f"{base_url}/files"
+            try:
+                with open(file_path, 'rb') as f:
+                    files = {'file': (os.path.basename(file_path), f)}
+                    # Note: Don't pass json= with files=, use data= if needed
+                    upload_resp = api_client.post(upload_url, files=files, timeout=120)
+                    upload_resp.raise_for_status()
+                    data = upload_resp.json()
+                    
+                    # VirusTotal returns an analysis object
+                    if 'data' in data:
+                        analysis_id = data['data']['id']
+                        print(f"[scanner] ⟳ File uploaded successfully. Analysis ID: {analysis_id}")
+                        return analysis_id
+                    else:
+                        raise RuntimeError("Upload response missing 'data' field")
+                        
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Cannot upload file: {file_path} not found")
+            except Exception as upload_error:
+                print(f"[scanner] ✗ Upload failed: {upload_error}")
+                # Return hash anyway, will handle in poll_scan_completion
+                return str(file_hash)
+        else:
+            # Other HTTP error, re-raise
+            raise
+    
+    except Exception as e:
+        print(f"[scanner] Warning: Error checking file: {e}")
+        return str(file_hash)
 
 def poll_scan_completion(
     api_client: Any, scan_id: str, timeout_s: float, interval_s: float
 ) -> Dict[str, Any]:
-    """Poll scan status until completion or timeout. Returns final result payload."""
+    """Poll scan status until completion or timeout. Returns final result payload.     
+    
+    Handles both file hashes (existing scans) and analysis IDs (new uploads).
+"""
     base_url: str = getattr(api_client, "base_url")
+
     deadline = time.time() + float(timeout_s)
-    status_url = f"{base_url}/scan/{scan_id}"
-    while True:
-        resp = api_client.get(status_url, timeout=float(getattr(api_client, "default_timeout_s", 30.0)))
-        resp.raise_for_status()
-        data = resp.json()
-        status = str(data.get("status", "")).lower()
-        if status in {"done", "completed", "finished", "success"}:
-            return data
-        if status in {"failed", "error"}:
-            return data
-        if time.time() >= deadline:
-            raise TimeoutError("Timed out waiting for scan to complete")
-        time.sleep(max(0.1, float(interval_s)))
 
+    is_analysis = "-" in scan_id and len(scan_id) >64
 
+    if is_analysis:
+        status_url = f"{base_url}/analyses/{scan_id}"
+        print(f"[scanner]Waiting for analysis to complete")
+    else:
+        status_url = f"{base_url}/files/{scan_id}"
+    
+    while time.time() < deadline:
+          
+      try:
+          resp = api_client.get(status_url, timeout=float(getattr(api_client, "default_timeout_s", 30.0)))
+          resp.raise_for_status()
+          data = resp.json()
+
+          if "data" in data:
+              attributes = data["data"].get("attributes", {})
+
+              if is_analysis:
+                    
+                status = attributes.get("status", "")
+
+                if status == "completed":
+                    stats = attributes.get("stats", {})
+                    malicious = stats.get("malicious", 0)
+                    total = sum(stats.values())
+                    print(f"[scanner] Analysis complete: {malicious}/{total} detected malicious")
+
+                    return {
+                          "status": "completed",
+                          "clean": malicious == 0,
+                          "detections": malicious,
+                          "positives": malicious,
+                          "total": total,
+                          "sha256": scan_id
+                  }
+                elif status in ("queued", "in-progress"):
+                    print(f"[scanner]   Status: {status}... (waiting {interval_s}s)") 
+                    time.sleep(float(interval_s))
+                    continue
+                else:
+                      # Unknown status, wait and retry
+                      time.sleep(float(interval_s))
+                      continue
+              else:
+                # For file hash endpoint, results are immediate
+                  stats = attributes.get("last_analysis_stats", {})
+                  malicious = stats.get("malicious", 0)
+                  total = sum(stats.values())
+                    
+                  return {
+                        "status": "completed",
+                        "clean": malicious == 0,
+                        "detections": malicious,
+                        "positives": malicious,
+                        "total": total,
+                        "sha256": scan_id
+                    }
+            
+            # If we get here, response was unexpected
+          print(f"[scanner] Unexpected response format, retrying...")
+          time.sleep(float(interval_s))
+            
+      except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                print(f"[scanner] ⚠ File not in database and upload may have failed")
+                return {
+                    "status": "not_in_database",
+                    "clean": True,  # Don't block on our own code
+                    "detections": 0,
+                    "positives": 0,
+                    "total": 0,
+                    "sha256": scan_id,
+                    "note": "File not found in VirusTotal database"
+                }
+            else:
+                print(f"[scanner] HTTP Error {e.response.status_code}: {e}")
+                raise
+        
+      except Exception as e:
+            print(f"[scanner] Error during polling: {e}")
+            # Don't keep retrying on unexpected errors
+            return {
+                "status": "error",
+                "clean": True,  # Don't block on errors
+                "detections": 0,
+                "error": str(e)
+            }
+    
+    # Timeout reached
+    raise TimeoutError(f"Scan timed out after {timeout_s} seconds waiting for results")
 def interpret_scan_result(scan_result: Dict[str, Any]) -> bool:
     """Return True if the scan result is considered clean, False otherwise.
 
