@@ -636,6 +636,7 @@ For questions, issues, or contributions:
 ---
 
 **Project Version:** 4.0 (Final Submission)  
+## Final Project video link: https://www.youtube.com/watch?v=VScAi1n1xyQ&t=1s
 **Last Updated:** December 2025  
 **Course:** Object-Oriented Programming  
 **Domain:** Information Retrieval and Analysis Tool
